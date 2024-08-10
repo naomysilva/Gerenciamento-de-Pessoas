@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Pessoas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background: #fff;
+            margin: 5px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gerenciamento de Pessoas</h1>
+
+    <form id="personForm">
+        <input type="hidden" id="editingName" />
+        <input type="text" id="name" placeholder="Nome" required />
+        <input type="number" id="salary" placeholder="Salário" required />
+        <label>
+            <input type="checkbox" id="approved" /> Aprovado
+        </label>
+        <input type="text" id="trainee" placeholder="Trainee" />
+        <label>Data de Início: <input type="date" id="dataInicio" required /></label>
+        <label>Data de Fim: <input type="date" id="dataFim" required /></label>
+        <button type="submit">Salvar</button>
+    </form>
+
+    <button id="checkPersonBtn">Verificar Existência</button>
+
+    <h2>Lista de Pessoas</h2>
+    <ul id="personList"></ul>
+
+    <div id="result"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const personForm = document.getElementById("personForm");
+            const personNameInput = document.getElementById("name");
+            const personSalaryInput = document.getElementById("salary");
+            const personApprovedInput = document.getElementById("approved");
+            const personTraineeInput = document.getElementById("trainee");
+            const personDataInicioInput = document.getElementById("dataInicio");
+            const personDataFimInput = document.getElementById("dataFim");
+            const editingNameInput = document.getElementById("editingName");
+            const resultDiv = document.getElementById("result");
+            const personList = document.getElementById("personList");
+
+            // Recupera o nome do usuário autenticado do sessionStorage
+            const userName = sessionStorage.getItem('userName');
+
+            // Redirect to login if not authenticated
+            if (!userName) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Function to create or update a person
+            async function createOrUpdatePerson(e) {
+                e.preventDefault();
+
+                const personData = {
+                    name: personNameInput.value,
+                    salary: parseFloat(personSalaryInput.value),
+                    approved: personApprovedInput.checked,
+                    trainee: personTraineeInput.value,
+                    dataInicio: new Date(personDataInicioInput.value),
+                    dataFim: new Date(personDataFimInput.value)
+                };
+
+                const isEditing = editingNameInput.value !== "";
+
+                try {
+                    const url = isEditing 
+                        ? `http://localhost:3000/person/${editingNameInput.value}`
+                        : "http://localhost:3000/person";
+                    const method = isEditing ? "PATCH" : "POST";
+
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(personData)
+                    });
+
+                    const data = await response.json();
+                    resultDiv.textContent = data.message || data.error;
+
+                    if (response.ok) {
+                        loadPersonList(); // Refresh list after creating/updating a person
+                        personForm.reset(); // Reset form after submission
+                        editingNameInput.value = ""; // Reset editing mode
+                    }
+                } catch (error) {
+                    console.error("Erro ao criar ou atualizar a pessoa:", error);
+                }
+            }
+
+            // Function to check if a person exists
+            async function checkPersonExists() {
+                const personName = personNameInput.value;
+
+                try {
+                    const response = await fetch(`http://localhost:3000/person/exists/${personName}`);
+                    const data = await response.json();
+
+                    resultDiv.textContent = data.message;
+                } catch (error) {
+                    console.error("Erro ao verificar se a pessoa existe:", error);
+                }
+            }
+
+            // Function to delete a person
+            async function deletePerson(name) {
+                try {
+                    const response = await fetch(`http://localhost:3000/person/${name}?deletedBy=${userName}`, {
+                        method: "DELETE"
+                    });
+
+                    const data = await response.json();
+                    resultDiv.textContent = data.message || data.error;
+
+                    if (response.ok) {
+                        loadPersonList(); // Refresh list after deleting a person
+                    }
+                } catch (error) {
+                    console.error("Erro ao deletar a pessoa:", error);
+                }
+            }
+
+            // Function to load and display the person list
+            async function loadPersonList() {
+                try {
+                    const response = await fetch("http://localhost:3000/person");
+                    const people = await response.json();
+
+                    personList.innerHTML = ""; // Clear the list before repopulating
+
+                    people.forEach(person => {
+                        const listItem = document.createElement("li");
+                        listItem.textContent = `${person.name} - Salário: ${person.salary} - Aprovado: ${person.approved ? 'Sim' : 'Não'} - Trainee: ${person.trainee || 'N/A'} - Início: ${new Date(person.dataInicio).toLocaleDateString()} - Fim: ${new Date(person.dataFim).toLocaleDateString()}`;
+
+                        // Add an edit button for each person
+                        const editButton = document.createElement("button");
+                        editButton.textContent = "Editar";
+                        editButton.addEventListener("click", () => {
+                            personNameInput.value = person.name;
+                            personSalaryInput.value = person.salary;
+                            personApprovedInput.checked = person.approved;
+                            personTraineeInput.value = person.trainee || "";
+                            personDataInicioInput.value = new Date(person.dataInicio).toISOString().split('T')[0];
+                            personDataFimInput.value = new Date(person.dataFim).toISOString().split('T')[0];
+                            editingNameInput.value = person.name;
+                        });
+                        listItem.appendChild(editButton);
+
+                        if (userName === 'admin') {
+                            const deleteButton = document.createElement("button");
+                            deleteButton.textContent = "Deletar";
+                            deleteButton.addEventListener("click", () => {
+                                if (confirm(`Tem certeza que deseja deletar ${person.name}?`)) {
+                                    deletePerson(person.name);
+                                }
+                            });
+                            listItem.appendChild(deleteButton);
+                        }
+
+                        personList.appendChild(listItem);
+                    });
+                } catch (error) {
+                    console.error("Erro ao carregar a lista de pessoas:", error);
+                }
+            }
+
+            // Event listeners
+            personForm.addEventListener("submit", createOrUpdatePerson);
+            document.getElementById("checkPersonBtn").addEventListener("click", checkPersonExists);
+
+            // Load the person list on page load
+            loadPersonList();
+        });
+    </script>
+</body>
+</html>
