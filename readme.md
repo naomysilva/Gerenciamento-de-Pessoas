@@ -25,3 +25,9 @@ e como user você pode apenas lista e atualizar pessoas
 banco de dados é mongodbatlas
 usando a tabela person
 e o banco é bancodaapi
+
+# primeiros passos
+
+1 - npm install
+2 - npm start
+3 - abra o arquivo login.html dentro da pasta frontend
